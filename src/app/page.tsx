@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import {
   BarChart,
@@ -59,9 +59,7 @@ function HeroStat({
   return (
     <div ref={ref} className="flex flex-col gap-2">
       <span className="text-5xl font-bold tracking-tight text-[#12110F]">
-        {prefix}
-        {val.toLocaleString()}
-        {suffix}
+        {prefix}{val.toLocaleString()}{suffix}
       </span>
       <span className="text-sm font-semibold uppercase tracking-widest text-[#6B6560]">
         {label}
@@ -70,7 +68,7 @@ function HeroStat({
   );
 }
 
-// ── Mini countup (inside project cards) ──────────────────────────────────────
+// ── Mini countup ──────────────────────────────────────────────────────────────
 function MiniCountUp({
   target,
   prefix = "",
@@ -85,14 +83,12 @@ function MiniCountUp({
   const val = useCountUp(target, 1.2, active);
   return (
     <p className="text-3xl font-bold tracking-tight text-[#12110F]">
-      {prefix}
-      {val.toLocaleString()}
-      {suffix}
+      {prefix}{val.toLocaleString()}{suffix}
     </p>
   );
 }
 
-// ── Fade-up animation wrapper ─────────────────────────────────────────────────
+// ── Fade-up wrapper ───────────────────────────────────────────────────────────
 function FadeUp({
   children,
   delay = 0,
@@ -115,7 +111,107 @@ function FadeUp({
   );
 }
 
-// ── Chart: Budget Tier (Project 01) ───────────────────────────────────────────
+// ── Skill accordion ───────────────────────────────────────────────────────────
+const SKILLS = [
+  {
+    label: "Paid Media Analytics",
+    description:
+      "Building store-level models that translate raw ad spend into defensible budget decisions — attribution, channel mix analysis, BDI/CDI frameworks, and anomaly detection across 180+ locations.",
+  },
+  {
+    label: "Attribution Modeling",
+    description:
+      "Designing auditable architectures that unify multi-channel data into a single source of truth for executive reporting, without sacrificing traceability or reconcilability.",
+  },
+  {
+    label: "SQL / Data Systems",
+    description:
+      "Writing production-grade SQL for demand analysis, CRM segmentation, and operational reporting — with QA processes that translate technical caveats into stakeholder-legible outputs.",
+  },
+  {
+    label: "AI-Assisted Workflows",
+    description:
+      "Using LLMs to accelerate analysis design, QA logic, and executive communications — turning multi-day projects into same-day deliverables without sacrificing rigor.",
+  },
+];
+
+// Animation constants: each pill opens over 420ms.
+// The next pill starts at 210ms (halfway through the previous).
+const PILL_DURATION = 0.42;
+const PILL_STAGGER  = 0.21;
+
+function SkillAccordion() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-100px" });
+  const [open, setOpen] = useState<Set<number>>(new Set());
+
+  // Auto-open in cascade when section enters view
+  useEffect(() => {
+    if (!inView) return;
+    SKILLS.forEach((_, i) => {
+      setTimeout(() => {
+        setOpen((prev) => new Set([...prev, i]));
+      }, i * PILL_STAGGER * 1000);
+    });
+  }, [inView]);
+
+  const toggle = (i: number) => {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  };
+
+  return (
+    <div ref={ref} className="mt-8 flex flex-col gap-2 max-w-xl">
+      {SKILLS.map((skill, i) => (
+        <div
+          key={skill.label}
+          className="overflow-hidden rounded-2xl border border-[#E8E4DC] bg-white shadow-sm"
+        >
+          <button
+            onClick={() => toggle(i)}
+            className="flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-[#F7F6F2]"
+          >
+            <span className="text-sm font-semibold text-[#12110F]">
+              {skill.label}
+            </span>
+            <motion.span
+              animate={{ rotate: open.has(i) ? 45 : 0 }}
+              transition={{ duration: 0.2 }}
+              className="ml-4 shrink-0 text-lg font-light text-[#6B6560] leading-none"
+            >
+              +
+            </motion.span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {open.has(i) && (
+              <motion.div
+                key="content"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: PILL_DURATION, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden"
+              >
+                <p className="border-t border-[#E8E4DC] px-5 py-4 text-sm leading-relaxed text-[#374151]">
+                  {skill.description}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+// Each chart only mounts recharts when both client-mounted AND in viewport,
+// so the built-in recharts entrance animation always fires on scroll arrival.
+
 function BudgetTierChart({ active }: { active: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -127,55 +223,26 @@ function BudgetTierChart({ active }: { active: boolean }) {
     { tier: "Protect", stores: 41, fill: ACCENT },
   ];
 
-  if (!mounted)
+  if (!mounted || !active)
     return <div className="h-52 rounded-xl bg-[#F0EDE6] animate-pulse" />;
 
   return (
     <>
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#6B6560]">
-        180 Corporate Stores by Budget Tier
+        180 Locations by Budget Tier
       </p>
       <ResponsiveContainer width="100%" height={200}>
-        <BarChart
-          data={data}
-          layout="vertical"
-          margin={{ left: 0, right: 36, top: 0, bottom: 0 }}
-        >
+        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 36, top: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DC" />
-          <XAxis
-            type="number"
-            tick={{ fontSize: 11, fill: "#9E988F" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            type="category"
-            dataKey="tier"
-            tick={{ fontSize: 12, fill: "#12110F", fontWeight: 500 }}
-            tickLine={false}
-            axisLine={false}
-            width={58}
-          />
-          <Bar
-            dataKey="stores"
-            radius={[0, 6, 6, 0]}
-            isAnimationActive={active}
-            animationDuration={900}
-            animationEasing="ease-out"
-          >
-            {data.map((d, i) => (
-              <Cell key={i} fill={d.fill} />
-            ))}
+          <XAxis type="number" tick={{ fontSize: 11, fill: "#9E988F" }} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey="tier" tick={{ fontSize: 12, fill: "#12110F", fontWeight: 500 }} tickLine={false} axisLine={false} width={58} />
+          <Bar dataKey="stores" radius={[0, 6, 6, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out">
+            {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
           </Bar>
           <Tooltip
             cursor={{ fill: "#F7F6F2" }}
-            formatter={(v) => [`${v} stores`, "Count"]}
-            contentStyle={{
-              background: "#fff",
-              border: "1px solid #E8E4DC",
-              borderRadius: 8,
-              fontSize: 12,
-            }}
+            formatter={(v) => [`${v} locations`, "Count"]}
+            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }}
           />
         </BarChart>
       </ResponsiveContainer>
@@ -183,7 +250,6 @@ function BudgetTierChart({ active }: { active: boolean }) {
   );
 }
 
-// ── Chart: Channel Mix (Project 02) ──────────────────────────────────────────
 function ChannelMixChart({ active }: { active: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -197,7 +263,7 @@ function ChannelMixChart({ active }: { active: boolean }) {
     { channel: "Other",         pct: 6  },
   ];
 
-  if (!mounted)
+  if (!mounted || !active)
     return <div className="h-64 rounded-xl bg-[#F0EDE6] animate-pulse" />;
 
   return (
@@ -206,44 +272,15 @@ function ChannelMixChart({ active }: { active: boolean }) {
         Paid Media Spend Distribution by Channel
       </p>
       <ResponsiveContainer width="100%" height={224}>
-        <BarChart
-          data={data}
-          layout="vertical"
-          margin={{ left: 0, right: 44, top: 0, bottom: 0 }}
-        >
+        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 44, top: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E8E4DC" />
-          <XAxis
-            type="number"
-            unit="%"
-            tick={{ fontSize: 11, fill: "#9E988F" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            type="category"
-            dataKey="channel"
-            tick={{ fontSize: 11, fill: "#12110F", fontWeight: 500 }}
-            tickLine={false}
-            axisLine={false}
-            width={90}
-          />
-          <Bar
-            dataKey="pct"
-            fill={ACCENT}
-            radius={[0, 6, 6, 0]}
-            isAnimationActive={active}
-            animationDuration={900}
-            animationEasing="ease-out"
-          />
+          <XAxis type="number" unit="%" tick={{ fontSize: 11, fill: "#9E988F" }} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey="channel" tick={{ fontSize: 11, fill: "#12110F", fontWeight: 500 }} tickLine={false} axisLine={false} width={90} />
+          <Bar dataKey="pct" fill={ACCENT} radius={[0, 6, 6, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out" />
           <Tooltip
             cursor={{ fill: "#F7F6F2" }}
             formatter={(v) => [`${v}%`, "Share of spend"]}
-            contentStyle={{
-              background: "#fff",
-              border: "1px solid #E8E4DC",
-              borderRadius: 8,
-              fontSize: 12,
-            }}
+            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }}
           />
         </BarChart>
       </ResponsiveContainer>
@@ -251,18 +288,17 @@ function ChannelMixChart({ active }: { active: boolean }) {
   );
 }
 
-// ── Chart: Service Split (Project 03) ────────────────────────────────────────
 function ServiceSplitChart({ active }: { active: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const data = [
-    { name: "Oil-related",            value: 62, fill: ACCENT     },
-    { name: "Non-oil (captured)",     value: 23, fill: "#9CA3AF"  },
-    { name: "Non-oil (undercounted)", value: 15, fill: AMBER      },
+    { name: "Oil-related",            value: 62, fill: ACCENT    },
+    { name: "Non-oil (captured)",     value: 23, fill: "#9CA3AF" },
+    { name: "Non-oil (undercounted)", value: 15, fill: AMBER     },
   ];
 
-  if (!mounted)
+  if (!mounted || !active)
     return <div className="h-64 rounded-xl bg-[#F0EDE6] animate-pulse" />;
 
   return (
@@ -280,29 +316,20 @@ function ServiceSplitChart({ active }: { active: boolean }) {
             outerRadius={92}
             paddingAngle={3}
             dataKey="value"
-            isAnimationActive={active}
+            isAnimationActive
             animationDuration={1000}
             animationEasing="ease-out"
           >
-            {data.map((d, i) => (
-              <Cell key={i} fill={d.fill} />
-            ))}
+            {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
           </Pie>
           <Legend
             iconType="circle"
             iconSize={8}
-            formatter={(v: string) => (
-              <span style={{ fontSize: 11, color: "#6B6560" }}>{v}</span>
-            )}
+            formatter={(v: string) => <span style={{ fontSize: 11, color: "#6B6560" }}>{v}</span>}
           />
           <Tooltip
             formatter={(v) => [`${v}%`, "Share"]}
-            contentStyle={{
-              background: "#fff",
-              border: "1px solid #E8E4DC",
-              borderRadius: 8,
-              fontSize: 12,
-            }}
+            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -338,22 +365,22 @@ const projects: Project[] = [
     number: "01",
     title: "Paid Media Budget Optimization",
     subtitle: "BDI/CDI Store-Level Reallocation Model",
-    company: "Grease Monkey / FullSpeed Automotive",
+    company: "National Automotive Franchise Group",
     headlinePrefix: "$",
     headlineNumber: 280,
     headlineSuffix: "K",
     headlineLabel: "reallocation opportunity identified",
-    tags: ["Snowflake SQL", "Excel", "Google Ads", "Cinch POS", "AI-assisted analysis"],
+    tags: ["Snowflake SQL", "Excel", "Google Ads", "Franchise POS Data", "AI-assisted analysis"],
     role: "Designed the framework, built the analysis model, and translated findings into executive-ready recommendations.",
     problem:
-      "Paid media budgets were spread too evenly across 180 corporate stores. Prior analysis relied on market-level estimates — too blunt for store-by-store decisions and unable to account for seasonal exceptions.",
+      "Paid media budgets were spread too evenly across 180 corporate locations. Prior analysis relied on market-level estimates — too blunt for store-by-store decisions and unable to account for seasonal exceptions.",
     action:
-      "Rebuilt the model around store-level BDI/CDI using ~1.1M Cinch transactions. Corrected ghost location IDs, added a seasonality checkpoint, and built a four-tier (Protect / Invest / Develop / Reduce) prioritization map with immediate-action tiers.",
+      "Rebuilt the model around store-level BDI/CDI using ~1.1M point-of-sale transactions. Corrected ghost location IDs, added a seasonality checkpoint, and built a four-tier (Protect / Invest / Develop / Reduce) prioritization map with immediate-action tiers.",
     result:
       "Leadership received a defensible $280K reallocation opportunity with a clear store-level action map — making budget conversations faster and more evidence-based.",
     miniStats: [
-      { target: 180, label: "stores analyzed" },
-      { display: "~1.1M", label: "Cinch transactions modeled" },
+      { target: 180, label: "locations analyzed" },
+      { display: "~1.1M", label: "POS transactions modeled" },
     ],
     Chart: BudgetTierChart,
   },
@@ -361,7 +388,7 @@ const projects: Project[] = [
     number: "02",
     title: "Multi-Channel Attribution Architecture",
     subtitle: "Store-Month Marketing Attribution Layer",
-    company: "FullSpeed Automotive (FSA)",
+    company: "National Automotive Franchise Group",
     headlinePrefix: "",
     headlineNumber: 6900,
     headlineSuffix: "",
@@ -369,13 +396,13 @@ const projects: Project[] = [
     tags: ["Excel modeling", "SharePoint", "Attribution design", "Executive reporting"],
     role: "Architected the model, codified assumptions, and aligned delivery with CMO/CEO planning workflows.",
     problem:
-      "Attribution logic lived across fragmented files and inconsistent assumptions — creating reconciliation risk and slowing executive reporting across 286 stores and 8 channels.",
+      "Attribution logic lived across fragmented files and inconsistent assumptions — creating reconciliation risk and slowing executive reporting across 286 locations and 8 channels.",
     action:
       "Designed an auditable Excel architecture with channel-specific allocation rules, clear input boundaries, and a dedicated CEO planning lever. Kept scenario planning separate from historical actuals to prevent version drift.",
     result:
-      "FSA gained a single trusted attribution layer covering 286 stores × 24 months. Monthly decision-making became more consistent across marketing leadership.",
+      "The organization gained a single trusted attribution layer covering 286 locations × 24 months. Monthly decision-making became more consistent across marketing leadership.",
     miniStats: [
-      { target: 286, label: "franchise stores covered" },
+      { target: 286, label: "franchise locations covered" },
       { target: 8, label: "channels unified" },
     ],
     Chart: ChannelMixChart,
@@ -383,20 +410,20 @@ const projects: Project[] = [
   {
     number: "03",
     title: "Store Service Intelligence System",
-    subtitle: "Demand Analysis + Journey Wizard Suppression",
-    company: "FullSpeed Automotive (FSA)",
+    subtitle: "Demand Analysis + CRM Journey Suppression",
+    company: "National Automotive Franchise Group",
     headlinePrefix: "up to ",
     headlineNumber: 40,
     headlineSuffix: "%",
     headlineLabel: "non-oil activity undercounted before taxonomy fix",
-    tags: ["Snowflake SQL", "Python", "Excel pipeline", "Cinch CRM", "Dashboard logic"],
+    tags: ["Snowflake SQL", "Python", "Excel pipeline", "Franchise CRM", "Dashboard logic"],
     role: "Led query design, data QA, translation of technical caveats, and stakeholder-facing delivery.",
     problem:
-      "Operations and marketing needed a reliable view of what services stores actually sell — but existing taxonomy logic was creating confusion and undercounting non-oil service activity by 25–40%.",
+      "Operations and marketing needed a reliable view of what services locations actually sell — but existing taxonomy logic was creating confusion and undercounting non-oil service activity by 25–40%.",
     action:
-      "Built unified Snowflake SQL and Excel outputs with fleet filtering, oil/non-oil toggles, and service taxonomy normalization across ~285 locations. Also designed the Journey Wizard YES-path suppression query to reduce irrelevant follow-up messaging.",
+      "Built unified SQL and Excel outputs with fleet filtering, oil/non-oil toggles, and service taxonomy normalization across ~285 locations. Also designed a CRM journey suppression query to reduce irrelevant follow-up messaging.",
     result:
-      "Teams got cleaner targeting logic and a more credible view of store demand — enabling better service marketing prioritization and less noise in retention workflows.",
+      "Teams got cleaner targeting logic and a more credible view of location demand — enabling better service marketing prioritization and less noise in retention workflows.",
     miniStats: [
       { target: 285, prefix: "~", label: "locations analyzed" },
       { display: "25–40%", label: "undercount gap corrected" },
@@ -405,14 +432,8 @@ const projects: Project[] = [
   },
 ];
 
-// ── Project section component ─────────────────────────────────────────────────
-function ProjectSection({
-  project,
-  index,
-}: {
-  project: Project;
-  index: number;
-}) {
+// ── Project section ───────────────────────────────────────────────────────────
+function ProjectSection({ project }: { project: Project }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
@@ -424,7 +445,7 @@ function ProjectSection({
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
       className="overflow-hidden rounded-3xl border border-[#E8E4DC] bg-white shadow-sm"
     >
-      {/* Header bar */}
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-[#E8E4DC] px-6 py-4 sm:px-8">
         <span className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
           Case Study {project.number}
@@ -433,12 +454,11 @@ function ProjectSection({
       </div>
 
       <div className="grid lg:grid-cols-[1fr_1.2fr]">
-        {/* Left: title, metric, PAR */}
+        {/* Left: title, metric callout, PAR */}
         <div className="border-b border-[#E8E4DC] p-6 sm:p-8 lg:border-b-0 lg:border-r">
           <h3 className="text-2xl font-bold tracking-tight">{project.title}</h3>
           <p className="mt-1 text-sm text-[#6B6560]">{project.subtitle}</p>
 
-          {/* Headline metric callout */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={inView ? { opacity: 1, scale: 1 } : {}}
@@ -449,20 +469,14 @@ function ProjectSection({
               Key outcome
             </p>
             <p className="mt-2 text-5xl font-bold tracking-tight text-[#1E3A8A]">
-              {project.headlinePrefix}
-              {project.headlineNumber.toLocaleString()}
-              {project.headlineSuffix}
+              {project.headlinePrefix}{project.headlineNumber.toLocaleString()}{project.headlineSuffix}
             </p>
             <p className="mt-1 text-sm text-[#374151]">{project.headlineLabel}</p>
           </motion.div>
 
-          {/* Tech stack pills */}
           <div className="mt-5 flex flex-wrap gap-2">
             {project.tags.map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-[#E8E4DC] bg-[#FAFAF8] px-3 py-1 text-xs font-medium text-[#6B6560]"
-              >
+              <span key={tag} className="rounded-full border border-[#E8E4DC] bg-[#FAFAF8] px-3 py-1 text-xs font-medium text-[#6B6560]">
                 {tag}
               </span>
             ))}
@@ -470,7 +484,6 @@ function ProjectSection({
 
           <p className="mt-4 text-xs italic text-[#9E988F]">{project.role}</p>
 
-          {/* PAR blocks */}
           <div className="mt-6 space-y-3">
             {[
               { label: "Problem", text: project.problem },
@@ -487,9 +500,7 @@ function ProjectSection({
                 <p className="text-xs font-bold uppercase tracking-widest text-[#9E988F]">
                   {block.label}
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-[#374151]">
-                  {block.text}
-                </p>
+                <p className="mt-2 text-sm leading-relaxed text-[#374151]">{block.text}</p>
               </motion.div>
             ))}
           </div>
@@ -501,21 +512,11 @@ function ProjectSection({
 
           <div className="mt-6 grid grid-cols-2 gap-4">
             {project.miniStats.map((s, i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-[#E8E4DC] bg-[#FAFAF8] px-4 py-4"
-              >
+              <div key={i} className="rounded-xl border border-[#E8E4DC] bg-[#FAFAF8] px-4 py-4">
                 {"target" in s ? (
-                  <MiniCountUp
-                    target={s.target}
-                    prefix={s.prefix}
-                    suffix={s.suffix}
-                    active={inView}
-                  />
+                  <MiniCountUp target={s.target} prefix={s.prefix} suffix={s.suffix} active={inView} />
                 ) : (
-                  <p className="text-3xl font-bold tracking-tight text-[#12110F]">
-                    {s.display}
-                  </p>
+                  <p className="text-3xl font-bold tracking-tight text-[#12110F]">{s.display}</p>
                 )}
                 <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-[#6B6560]">
                   {s.label}
@@ -533,14 +534,11 @@ function ProjectSection({
 export default function Home() {
   return (
     <main className="bg-[#FAFAF8] text-[#12110F]">
-      {/* Scroll progress line */}
       <div className="scroll-progress" aria-hidden />
 
       {/* Nav */}
       <nav className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between bg-[#FAFAF8]/80 px-6 py-4 backdrop-blur-sm sm:px-12">
-        <span className="text-sm font-bold tracking-wide text-[#12110F]">
-          Sam Evans
-        </span>
+        <span className="text-sm font-bold tracking-wide text-[#12110F]">Sam Evans</span>
         <a
           href="https://github.com/SKE-creator"
           target="_blank"
@@ -578,37 +576,24 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.22 }}
             className="mt-7 max-w-xl text-lg leading-relaxed text-[#6B6560]"
           >
-            Senior marketing analyst at FullSpeed Automotive. 8+ years translating messy
-            data, fragmented attribution, and unclear briefs into evidence-based
-            recommendations executives can act on.
+            Senior marketing analyst at a national automotive franchise group. 8+ years
+            translating messy data, fragmented attribution, and unclear briefs into
+            evidence-based recommendations executives can act on.
           </motion.p>
 
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.34 }}
-            className="mt-8 flex flex-wrap gap-2"
           >
-            {[
-              "Paid Media Analytics",
-              "Attribution Modeling",
-              "SQL / Data Systems",
-              "AI-Assisted Workflows",
-            ].map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-[#E8E4DC] bg-white px-4 py-1.5 text-sm font-medium text-[#12110F] shadow-sm"
-              >
-                {tag}
-              </span>
-            ))}
+            <SkillAccordion />
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.0 }}
-            className="mt-16 flex items-center gap-2 text-sm text-[#9E988F]"
+            className="mt-14 flex items-center gap-2 text-sm text-[#9E988F]"
           >
             <span>Scroll to explore</span>
             <motion.span
@@ -626,7 +611,7 @@ export default function Home() {
         <div className="mx-auto grid w-full max-w-5xl gap-10 sm:grid-cols-3">
           <HeroStat target={8} suffix="+" label="Years in marketing analytics" />
           <HeroStat target={280} prefix="$" suffix="K" label="Reallocation opportunity identified" />
-          <HeroStat target={286} label="Franchise stores modeled" />
+          <HeroStat target={286} label="Franchise locations modeled" />
         </div>
       </section>
 
@@ -637,19 +622,17 @@ export default function Home() {
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]">
               Selected Work
             </p>
-            <h2 className="mt-3 text-4xl font-bold tracking-tight">
-              Three case studies.
-            </h2>
+            <h2 className="mt-3 text-4xl font-bold tracking-tight">Three case studies.</h2>
             <p className="mt-3 max-w-xl text-[#6B6560]">
-              Each built around a real business problem at FullSpeed Automotive —
-              written for fast scan: problem, action, result.
+              Each built around a real business problem at a national franchise automotive
+              group — written for fast scan: problem, action, result.
             </p>
           </FadeUp>
         </div>
 
         <div className="mx-auto mt-14 w-full max-w-5xl space-y-16">
-          {projects.map((project, idx) => (
-            <ProjectSection key={project.number} project={project} index={idx} />
+          {projects.map((project) => (
+            <ProjectSection key={project.number} project={project} />
           ))}
         </div>
       </section>
@@ -668,31 +651,15 @@ export default function Home() {
 
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              {
-                n: "01",
-                step: "Frame the business question clearly enough that the answer is unambiguous.",
-              },
-              {
-                n: "02",
-                step: "Build an analysis system that holds up under scrutiny, not just under deadline.",
-              },
-              {
-                n: "03",
-                step: "Translate technical work into executive decisions, not just findings.",
-              },
-              {
-                n: "04",
-                step: "Tie every recommendation to a measurable business impact.",
-              },
+              { n: "01", step: "Frame the business question clearly enough that the answer is unambiguous." },
+              { n: "02", step: "Build an analysis system that holds up under scrutiny, not just under deadline." },
+              { n: "03", step: "Translate technical work into executive decisions, not just findings." },
+              { n: "04", step: "Tie every recommendation to a measurable business impact." },
             ].map((item, i) => (
               <FadeUp key={item.n} delay={i * 0.08}>
                 <div className="h-full rounded-2xl border border-[#C7D2FE] bg-white p-6">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
-                    {item.n}
-                  </p>
-                  <p className="mt-3 text-sm leading-relaxed text-[#374151]">
-                    {item.step}
-                  </p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">{item.n}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-[#374151]">{item.step}</p>
                 </div>
               </FadeUp>
             ))}
@@ -703,11 +670,9 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-[#E8E4DC] px-6 py-10 sm:px-12 lg:px-20">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#6B6560]">
-            Sam Evans · Denver, CO · Marketing Analytics
-          </p>
+          <p className="text-sm text-[#6B6560]">Sam Evans · Denver, CO · Marketing Analytics</p>
           <a
-            href="https://github.com/SKE-creator/ai-brag-site"
+            href="https://github.com/SKE-creator/professional-portfolio"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-[#1E40AF] hover:underline"

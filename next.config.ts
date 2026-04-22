@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const isGithubActions = process.env.GITHUB_ACTIONS === "true";
-const repoName = "ai-brag-site";
+const repoName = "professional-portfolio";
 
 const nextConfig: NextConfig = {
   output: "export",
