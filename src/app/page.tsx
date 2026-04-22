@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
@@ -158,71 +158,56 @@ function FadeUp({ children, delay = 0, className = "" }: {
   );
 }
 
-// ── Skill pills with click-to-expand panel ────────────────────────────────────
+// ── Skills — 4 side-by-side boxes that cascade open on scroll ─────────────────
 const SKILLS = [
   {
     label: "Marketing Analytics",
     description:
-      "I design measurement frameworks that scale across hundreds of locations — models with auditable logic, documented assumptions, and clear input boundaries that survive leadership transitions and board-level scrutiny. My goal is always analysis the next person can inherit, not just interpret.",
+      "Frameworks that scale across hundreds of locations — auditable models with documented assumptions built to outlast the analyst who built them.",
   },
   {
     label: "Revenue Attribution",
     description:
-      "I architect multi-channel attribution systems that unify fragmented spend data into a single organizational source of truth. The methodology has to be transparent enough that a CFO can challenge it and still trust the output — black-box models don't survive executive reviews.",
+      "Multi-channel attribution architectures transparent enough for a CFO to challenge and still trust. No black boxes, no fragile assumptions.",
   },
   {
     label: "Data Engineering",
     description:
-      "I write production-grade SQL and build data pipelines designed for longevity: QA logic, taxonomy normalization, fleet segmentation, edge case documentation. Infrastructure that makes technical complexity invisible to end users and maintainable by whoever comes next.",
+      "Production SQL and pipelines with QA logic, taxonomy normalization, and edge case handling. Built for whoever inherits it, not just the current deadline.",
   },
   {
     label: "AI-Augmented Execution",
     description:
-      "I use LLMs as a force multiplier across the full analytics workflow — analysis design, QA logic, stakeholder documentation, executive translation. Projects that used to take three days now close same-day, without trading rigor for speed.",
+      "LLMs as a velocity multiplier — same-day delivery on analysis that used to take three days, without trading rigor for speed.",
   },
 ];
 
-function SkillPills() {
-  const [selected, setSelected] = useState<number | null>(null);
+function SkillBoxes() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true });
   return (
-    <div className="mt-8 max-w-xl">
-      <div className="flex flex-wrap gap-2">
-        {SKILLS.map((s, i) => (
-          <button
-            key={s.label}
-            onClick={() => setSelected(i === selected ? null : i)}
-            className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
-              selected === i
-                ? "border-[#1E40AF] bg-[#1E40AF] text-white shadow-md"
-                : "border-[#E8E4DC] bg-white text-[#12110F] shadow-sm hover:border-[#1E40AF]/40 hover:shadow"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      <AnimatePresence mode="wait">
-        {selected !== null && (
+    <div ref={ref} className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {SKILLS.map((skill, i) => (
+        <motion.div
+          key={skill.label}
+          initial={{ opacity: 0, y: 8 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.35, delay: 0.8 + i * 0.15, ease: "easeOut" }}
+          className="rounded-2xl border border-[#E8E4DC] bg-white/90 p-5 shadow-sm backdrop-blur-sm"
+        >
+          <p className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
+            {skill.label}
+          </p>
           <motion.div
-            key={selected}
-            initial={{ opacity: 0, height: 0, marginTop: 0 }}
-            animate={{ opacity: 1, height: "auto", marginTop: 12 }}
-            exit={{ opacity: 0, height: 0, marginTop: 0 }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={inView ? { height: "auto", opacity: 1 } : {}}
+            transition={{ duration: 0.5, delay: 0.92 + i * 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="rounded-2xl border border-[#E8E4DC] bg-white px-5 py-4 shadow-sm">
-              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
-                {SKILLS[selected].label}
-              </p>
-              <p className="text-sm leading-relaxed text-[#374151]">
-                {SKILLS[selected].description}
-              </p>
-            </div>
+            <p className="mt-3 text-sm leading-relaxed text-[#374151]">{skill.description}</p>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </motion.div>
+      ))}
     </div>
   );
 }
@@ -569,16 +554,11 @@ export default function Home() {
             className="mt-7 max-w-xl text-lg leading-relaxed text-[#6B6560]"
           >
             Senior marketing analyst at a national automotive franchise group. 8+ years
-            translating messy data, fragmented attribution, and unclear briefs into
-            evidence-based recommendations executives can act on.
+            translating fragmented data, shifting priorities, and ambiguous business
+            questions into evidence-based recommendations executives can act on.
           </motion.p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.34 }}
-          >
-            <SkillPills />
-          </motion.div>
+          <SkillBoxes />
 
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -597,8 +577,8 @@ export default function Home() {
       <section className="border-y border-[#E8E4DC] bg-white px-6 py-14 sm:px-12 lg:px-20">
         <div className="mx-auto grid w-full max-w-5xl gap-10 sm:grid-cols-3">
           <HeroStat target={8} suffix="+" label="Years in marketing analytics" />
-          <HeroStat target={280} prefix="$" suffix="K" label="Reallocation opportunity identified" />
-          <HeroStat target={286} label="Franchise locations modeled" />
+          <HeroStat target={15} prefix="$" suffix="M+" label="In annual paid media managed" />
+          <HeroStat target={4} prefix="$" suffix="M+" label="In optimization impact identified" />
         </div>
       </section>
 
