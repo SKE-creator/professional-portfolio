@@ -859,6 +859,121 @@ function AIProjectSection({ project }: { project: AIProject }) {
   );
 }
 
+// ── Methodology flowchart ─────────────────────────────────────────────────────
+const STEPS = [
+  { n: "01", label: "Frame",     step: "Define the business question until the answer is unambiguous." },
+  { n: "02", label: "Build",     step: "Design an analysis that survives scrutiny, not just deadlines." },
+  { n: "03", label: "Translate", step: "Convert technical findings into executive decisions." },
+  { n: "04", label: "Tie",       step: "Every recommendation lands on a measurable business impact." },
+];
+
+function Methodology() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-80px" });
+
+  return (
+    <section ref={ref} className="bg-[#EEF2FF] px-6 py-20 sm:px-12 lg:px-20">
+      <div className="mx-auto w-full max-w-5xl">
+        <FadeUp>
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]">How I Work</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight">The process behind the output.</h2>
+        </FadeUp>
+
+        {/* Flowchart — desktop: horizontal chain; mobile: vertical */}
+        <div className="mt-14">
+          {/* Desktop row */}
+          <div className="hidden items-start lg:flex">
+            {STEPS.map((item, i) => (
+              <div key={item.n} className="flex flex-1 items-start">
+                {/* Node */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={inView ? { opacity: 1, scale: 1 } : {}}
+                  transition={{ duration: 0.45, delay: i * 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-col items-center text-center"
+                  style={{ flex: "1 1 0" }}
+                >
+                  {/* Circle badge */}
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-[#1E40AF] bg-white shadow-sm">
+                    <span className="text-xs font-bold text-[#1E40AF]">{item.n}</span>
+                  </div>
+                  <p className="mt-3 text-sm font-bold uppercase tracking-widest text-[#1E40AF]">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 max-w-[160px] text-sm leading-relaxed text-[#374151]">
+                    {item.step}
+                  </p>
+                </motion.div>
+
+                {/* Connector arrow — not after last item */}
+                {i < STEPS.length - 1 && (
+                  <div className="relative flex items-center" style={{ marginTop: "22px", flex: "0 0 auto", width: "32px" }}>
+                    <motion.div
+                      initial={{ scaleX: 0 }}
+                      animate={inView ? { scaleX: 1 } : {}}
+                      transition={{ duration: 0.3, delay: i * 0.18 + 0.3, ease: "easeOut" }}
+                      style={{ transformOrigin: "left" }}
+                      className="h-px w-full bg-[#1E40AF]/30"
+                    />
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={inView ? { opacity: 1 } : {}}
+                      transition={{ delay: i * 0.18 + 0.5 }}
+                      className="absolute -right-1 text-[#1E40AF]/40 text-xs"
+                    >
+                      ›
+                    </motion.span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile vertical chain */}
+          <div className="flex flex-col gap-0 lg:hidden">
+            {STEPS.map((item, i) => (
+              <div key={item.n} className="flex gap-5">
+                {/* Left track */}
+                <div className="flex flex-col items-center">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={inView ? { opacity: 1, scale: 1 } : {}}
+                    transition={{ duration: 0.35, delay: i * 0.18 }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-[#1E40AF] bg-white shadow-sm"
+                  >
+                    <span className="text-xs font-bold text-[#1E40AF]">{item.n}</span>
+                  </motion.div>
+                  {i < STEPS.length - 1 && (
+                    <motion.div
+                      initial={{ scaleY: 0 }}
+                      animate={inView ? { scaleY: 1 } : {}}
+                      transition={{ duration: 0.3, delay: i * 0.18 + 0.3 }}
+                      style={{ transformOrigin: "top" }}
+                      className="w-px flex-1 bg-[#1E40AF]/30 my-1"
+                    />
+                  )}
+                </div>
+                {/* Content */}
+                <motion.div
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={inView ? { opacity: 1, x: 0 } : {}}
+                  transition={{ duration: 0.4, delay: i * 0.18 + 0.1 }}
+                  className="pb-8"
+                >
+                  <p className="text-sm font-bold uppercase tracking-widest text-[#1E40AF]">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-[#374151]">{item.step}</p>
+                </motion.div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function Home() {
   const { canvasRef, onMouseMove, onMouseLeave } = useDotGrid();
@@ -868,16 +983,8 @@ export default function Home() {
       <div className="scroll-progress" aria-hidden />
 
       {/* Nav */}
-      <nav className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between bg-[#FAFAF8]/80 px-6 py-4 backdrop-blur-sm sm:px-12">
+      <nav className="fixed left-0 right-0 top-0 z-40 bg-[#FAFAF8]/80 px-6 py-4 backdrop-blur-sm sm:px-12">
         <span className="text-sm font-bold tracking-wide">Sam Evans</span>
-        <a
-          href="https://github.com/SKE-creator"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-[#6B6560] transition-colors hover:text-[#12110F]"
-        >
-          GitHub ↗
-        </a>
       </nav>
 
       {/* Hero with interactive dot grid */}
@@ -990,44 +1097,14 @@ export default function Home() {
         <AIProjectSection key={p.number} project={p} />
       ))}
 
-      {/* Methodology */}
-      <section className="bg-[#EEF2FF] px-6 py-20 sm:px-12 lg:px-20">
-        <div className="mx-auto w-full max-w-5xl">
-          <FadeUp>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]">How I Work</p>
-            <h2 className="mt-3 text-4xl font-bold tracking-tight">The process behind the output.</h2>
-          </FadeUp>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { n: "01", step: "Frame the business question clearly enough that the answer is unambiguous." },
-              { n: "02", step: "Build an analysis system that holds up under scrutiny, not just under deadline." },
-              { n: "03", step: "Translate technical work into executive decisions, not just findings." },
-              { n: "04", step: "Tie every recommendation to a measurable business impact." },
-            ].map((item, i) => (
-              <FadeUp key={item.n} delay={i * 0.08}>
-                <div className="h-full rounded-2xl border border-[#C7D2FE] bg-white p-6">
-                  <p className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">{item.n}</p>
-                  <p className="mt-3 text-sm leading-relaxed text-[#374151]">{item.step}</p>
-                </div>
-              </FadeUp>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Methodology — animated flowchart */}
+      <Methodology />
 
       {/* Footer */}
       <footer className="border-t border-[#E8E4DC] px-6 py-10 sm:px-12 lg:px-20">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#6B6560]">Sam Evans · Denver, CO · Marketing Analytics</p>
-          <a
-            href="https://github.com/SKE-creator/professional-portfolio"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-[#1E40AF] hover:underline"
-          >
-            View source on GitHub ↗
-          </a>
-        </div>
+        <p className="mx-auto w-full max-w-5xl text-sm text-[#6B6560]">
+          Sam Evans · Denver, CO · Marketing Analytics
+        </p>
       </footer>
     </main>
   );
