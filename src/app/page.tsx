@@ -3,17 +3,8 @@
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
+  PieChart, Pie, Legend,
 } from "recharts";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -22,7 +13,7 @@ const AMBER  = "#B45309";
 const VIOLET = "#6D28D9";
 const RED    = "#B91C1C";
 
-// ── CountUp hook ──────────────────────────────────────────────────────────────
+// ── CountUp ───────────────────────────────────────────────────────────────────
 function useCountUp(target: number, duration = 1.4, active = false) {
   const [val, setVal] = useState(0);
   useEffect(() => {
@@ -31,8 +22,7 @@ function useCountUp(target: number, duration = 1.4, active = false) {
     const t0 = performance.now();
     const tick = (now: number) => {
       const p = Math.min((now - t0) / (duration * 1000), 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(Math.round(eased * target));
+      setVal(Math.round((1 - Math.pow(1 - p, 3)) * target));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -41,17 +31,88 @@ function useCountUp(target: number, duration = 1.4, active = false) {
   return val;
 }
 
-// ── Hero stat with countup ────────────────────────────────────────────────────
-function HeroStat({
-  target,
-  prefix = "",
-  suffix = "",
-  label,
-}: {
-  target: number;
-  prefix?: string;
-  suffix?: string;
-  label: string;
+// ── Interactive dot grid (spring-physics mouse repulsion) ─────────────────────
+function useDotGrid() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef  = useRef({ x: -9999, y: -9999 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const SPACING  = 28;
+    const DOT_R    = 1.5;
+    const COLOR    = "#C3C0B9";
+    const REPEL    = 90;
+    const STRENGTH = 3.5;
+    const SPRING   = 0.055;
+    const DAMP     = 0.82;
+
+    type Dot = { ox: number; oy: number; x: number; y: number; vx: number; vy: number };
+    let dots: Dot[] = [];
+    let raf = 0;
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      canvas.width  = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dots = [];
+      for (let ox = SPACING / 2; ox < w; ox += SPACING)
+        for (let oy = SPACING / 2; oy < h; oy += SPACING)
+          dots.push({ ox, oy, x: ox, y: oy, vx: 0, vy: 0 });
+    };
+
+    const draw = () => {
+      const { x: mx, y: my } = mouseRef.current;
+      ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+      ctx.fillStyle = COLOR;
+      for (const d of dots) {
+        const dx = d.x - mx;
+        const dy = d.y - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < REPEL && dist > 0) {
+          const f = (1 - dist / REPEL) * STRENGTH;
+          d.vx += (dx / dist) * f;
+          d.vy += (dy / dist) * f;
+        }
+        d.vx += (d.ox - d.x) * SPRING;
+        d.vy += (d.oy - d.y) * SPRING;
+        d.vx *= DAMP;
+        d.vy *= DAMP;
+        d.x  += d.vx;
+        d.y  += d.vy;
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, DOT_R, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(draw);
+    };
+
+    resize();
+    draw();
+
+    const ro = new ResizeObserver(resize);
+    if (canvas.parentElement) ro.observe(canvas.parentElement);
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+  }, []);
+
+  const onMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+  const onMouseLeave = () => { mouseRef.current = { x: -9999, y: -9999 }; };
+
+  return { canvasRef, onMouseMove, onMouseLeave };
+}
+
+// ── HeroStat ──────────────────────────────────────────────────────────────────
+function HeroStat({ target, prefix = "", suffix = "", label }: {
+  target: number; prefix?: string; suffix?: string; label: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
@@ -68,35 +129,21 @@ function HeroStat({
   );
 }
 
-// ── Mini countup ──────────────────────────────────────────────────────────────
-function MiniCountUp({
-  target,
-  prefix = "",
-  suffix = "",
-  active,
-}: {
-  target: number;
-  prefix?: string;
-  suffix?: string;
-  active: boolean;
+// ── MiniCountUp ───────────────────────────────────────────────────────────────
+function MiniCountUp({ target, prefix = "", suffix = "", active }: {
+  target: number; prefix?: string; suffix?: string; active: boolean;
 }) {
   const val = useCountUp(target, 1.2, active);
   return (
-    <p className="text-3xl font-bold tracking-tight text-[#12110F]">
+    <p className="text-2xl font-bold tracking-tight text-[#12110F]">
       {prefix}{val.toLocaleString()}{suffix}
     </p>
   );
 }
 
-// ── Fade-up wrapper ───────────────────────────────────────────────────────────
-function FadeUp({
-  children,
-  delay = 0,
-  className = "",
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
+// ── FadeUp ────────────────────────────────────────────────────────────────────
+function FadeUp({ children, delay = 0, className = "" }: {
+  children: React.ReactNode; delay?: number; className?: string;
 }) {
   return (
     <motion.div
@@ -111,121 +158,88 @@ function FadeUp({
   );
 }
 
-// ── Skill accordion ───────────────────────────────────────────────────────────
+// ── Skill pills with click-to-expand panel ────────────────────────────────────
 const SKILLS = [
   {
-    label: "Paid Media Analytics",
+    label: "Marketing Analytics",
     description:
-      "Building store-level models that translate raw ad spend into defensible budget decisions — attribution, channel mix analysis, BDI/CDI frameworks, and anomaly detection across 180+ locations.",
+      "I design measurement frameworks that scale across hundreds of locations — models with auditable logic, documented assumptions, and clear input boundaries that survive leadership transitions and board-level scrutiny. My goal is always analysis the next person can inherit, not just interpret.",
   },
   {
-    label: "Attribution Modeling",
+    label: "Revenue Attribution",
     description:
-      "Designing auditable architectures that unify multi-channel data into a single source of truth for executive reporting, without sacrificing traceability or reconcilability.",
+      "I architect multi-channel attribution systems that unify fragmented spend data into a single organizational source of truth. The methodology has to be transparent enough that a CFO can challenge it and still trust the output — black-box models don't survive executive reviews.",
   },
   {
-    label: "SQL / Data Systems",
+    label: "Data Engineering",
     description:
-      "Writing production-grade SQL for demand analysis, CRM segmentation, and operational reporting — with QA processes that translate technical caveats into stakeholder-legible outputs.",
+      "I write production-grade SQL and build data pipelines designed for longevity: QA logic, taxonomy normalization, fleet segmentation, edge case documentation. Infrastructure that makes technical complexity invisible to end users and maintainable by whoever comes next.",
   },
   {
-    label: "AI-Assisted Workflows",
+    label: "AI-Augmented Execution",
     description:
-      "Using LLMs to accelerate analysis design, QA logic, and executive communications — turning multi-day projects into same-day deliverables without sacrificing rigor.",
+      "I use LLMs as a force multiplier across the full analytics workflow — analysis design, QA logic, stakeholder documentation, executive translation. Projects that used to take three days now close same-day, without trading rigor for speed.",
   },
 ];
 
-// Animation constants: each pill opens over 420ms.
-// The next pill starts at 210ms (halfway through the previous).
-const PILL_DURATION = 0.42;
-const PILL_STAGGER  = 0.21;
-
-function SkillAccordion() {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-100px" });
-  const [open, setOpen] = useState<Set<number>>(new Set());
-
-  // Auto-open in cascade when section enters view
-  useEffect(() => {
-    if (!inView) return;
-    SKILLS.forEach((_, i) => {
-      setTimeout(() => {
-        setOpen((prev) => new Set([...prev, i]));
-      }, i * PILL_STAGGER * 1000);
-    });
-  }, [inView]);
-
-  const toggle = (i: number) => {
-    setOpen((prev) => {
-      const next = new Set(prev);
-      next.has(i) ? next.delete(i) : next.add(i);
-      return next;
-    });
-  };
-
+function SkillPills() {
+  const [selected, setSelected] = useState<number | null>(null);
   return (
-    <div ref={ref} className="mt-8 flex flex-col gap-2 max-w-xl">
-      {SKILLS.map((skill, i) => (
-        <div
-          key={skill.label}
-          className="overflow-hidden rounded-2xl border border-[#E8E4DC] bg-white shadow-sm"
-        >
+    <div className="mt-8 max-w-xl">
+      <div className="flex flex-wrap gap-2">
+        {SKILLS.map((s, i) => (
           <button
-            onClick={() => toggle(i)}
-            className="flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-[#F7F6F2]"
+            key={s.label}
+            onClick={() => setSelected(i === selected ? null : i)}
+            className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-all duration-200 ${
+              selected === i
+                ? "border-[#1E40AF] bg-[#1E40AF] text-white shadow-md"
+                : "border-[#E8E4DC] bg-white text-[#12110F] shadow-sm hover:border-[#1E40AF]/40 hover:shadow"
+            }`}
           >
-            <span className="text-sm font-semibold text-[#12110F]">
-              {skill.label}
-            </span>
-            <motion.span
-              animate={{ rotate: open.has(i) ? 45 : 0 }}
-              transition={{ duration: 0.2 }}
-              className="ml-4 shrink-0 text-lg font-light text-[#6B6560] leading-none"
-            >
-              +
-            </motion.span>
+            {s.label}
           </button>
+        ))}
+      </div>
 
-          <AnimatePresence initial={false}>
-            {open.has(i) && (
-              <motion.div
-                key="content"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: PILL_DURATION, ease: [0.22, 1, 0.36, 1] }}
-                className="overflow-hidden"
-              >
-                <p className="border-t border-[#E8E4DC] px-5 py-4 text-sm leading-relaxed text-[#374151]">
-                  {skill.description}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      ))}
+      <AnimatePresence mode="wait">
+        {selected !== null && (
+          <motion.div
+            key={selected}
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: "auto", marginTop: 12 }}
+            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="rounded-2xl border border-[#E8E4DC] bg-white px-5 py-4 shadow-sm">
+              <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
+                {SKILLS[selected].label}
+              </p>
+              <p className="text-sm leading-relaxed text-[#374151]">
+                {SKILLS[selected].description}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-// ── Charts ────────────────────────────────────────────────────────────────────
-// Each chart only mounts recharts when both client-mounted AND in viewport,
-// so the built-in recharts entrance animation always fires on scroll arrival.
+// ── Charts — only mount recharts when in-viewport so animation always fires ───
 
 function BudgetTierChart({ active }: { active: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-
   const data = [
     { tier: "Reduce",  stores: 26, fill: RED    },
     { tier: "Develop", stores: 65, fill: AMBER  },
     { tier: "Invest",  stores: 48, fill: VIOLET },
     { tier: "Protect", stores: 41, fill: ACCENT },
   ];
-
   if (!mounted || !active)
     return <div className="h-52 rounded-xl bg-[#F0EDE6] animate-pulse" />;
-
   return (
     <>
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#6B6560]">
@@ -239,11 +253,8 @@ function BudgetTierChart({ active }: { active: boolean }) {
           <Bar dataKey="stores" radius={[0, 6, 6, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out">
             {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
           </Bar>
-          <Tooltip
-            cursor={{ fill: "#F7F6F2" }}
-            formatter={(v) => [`${v} locations`, "Count"]}
-            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }}
-          />
+          <Tooltip cursor={{ fill: "#F7F6F2" }} formatter={(v) => [`${v} locations`, "Count"]}
+            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }} />
         </BarChart>
       </ResponsiveContainer>
     </>
@@ -253,7 +264,6 @@ function BudgetTierChart({ active }: { active: boolean }) {
 function ChannelMixChart({ active }: { active: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-
   const data = [
     { channel: "Google Search", pct: 34 },
     { channel: "Meta",          pct: 22 },
@@ -262,14 +272,12 @@ function ChannelMixChart({ active }: { active: boolean }) {
     { channel: "Display",       pct: 8  },
     { channel: "Other",         pct: 6  },
   ];
-
   if (!mounted || !active)
     return <div className="h-64 rounded-xl bg-[#F0EDE6] animate-pulse" />;
-
   return (
     <>
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#6B6560]">
-        Paid Media Spend Distribution by Channel
+        Paid Media Spend by Channel
       </p>
       <ResponsiveContainer width="100%" height={224}>
         <BarChart data={data} layout="vertical" margin={{ left: 0, right: 44, top: 0, bottom: 0 }}>
@@ -277,11 +285,8 @@ function ChannelMixChart({ active }: { active: boolean }) {
           <XAxis type="number" unit="%" tick={{ fontSize: 11, fill: "#9E988F" }} tickLine={false} axisLine={false} />
           <YAxis type="category" dataKey="channel" tick={{ fontSize: 11, fill: "#12110F", fontWeight: 500 }} tickLine={false} axisLine={false} width={90} />
           <Bar dataKey="pct" fill={ACCENT} radius={[0, 6, 6, 0]} isAnimationActive animationDuration={900} animationEasing="ease-out" />
-          <Tooltip
-            cursor={{ fill: "#F7F6F2" }}
-            formatter={(v) => [`${v}%`, "Share of spend"]}
-            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }}
-          />
+          <Tooltip cursor={{ fill: "#F7F6F2" }} formatter={(v) => [`${v}%`, "Share of spend"]}
+            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }} />
         </BarChart>
       </ResponsiveContainer>
     </>
@@ -291,16 +296,13 @@ function ChannelMixChart({ active }: { active: boolean }) {
 function ServiceSplitChart({ active }: { active: boolean }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-
   const data = [
     { name: "Oil-related",            value: 62, fill: ACCENT    },
     { name: "Non-oil (captured)",     value: 23, fill: "#9CA3AF" },
     { name: "Non-oil (undercounted)", value: 15, fill: AMBER     },
   ];
-
   if (!mounted || !active)
     return <div className="h-64 rounded-xl bg-[#F0EDE6] animate-pulse" />;
-
   return (
     <>
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-[#6B6560]">
@@ -308,29 +310,14 @@ function ServiceSplitChart({ active }: { active: boolean }) {
       </p>
       <ResponsiveContainer width="100%" height={224}>
         <PieChart>
-          <Pie
-            data={data}
-            cx="45%"
-            cy="50%"
-            innerRadius={58}
-            outerRadius={92}
-            paddingAngle={3}
-            dataKey="value"
-            isAnimationActive
-            animationDuration={1000}
-            animationEasing="ease-out"
-          >
+          <Pie data={data} cx="45%" cy="50%" innerRadius={58} outerRadius={92} paddingAngle={3}
+            dataKey="value" isAnimationActive animationDuration={1000} animationEasing="ease-out">
             {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
           </Pie>
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            formatter={(v: string) => <span style={{ fontSize: 11, color: "#6B6560" }}>{v}</span>}
-          />
-          <Tooltip
-            formatter={(v) => [`${v}%`, "Share"]}
-            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }}
-          />
+          <Legend iconType="circle" iconSize={8}
+            formatter={(v: string) => <span style={{ fontSize: 11, color: "#6B6560" }}>{v}</span>} />
+          <Tooltip formatter={(v) => [`${v}%`, "Share"]}
+            contentStyle={{ background: "#fff", border: "1px solid #E8E4DC", borderRadius: 8, fontSize: 12 }} />
         </PieChart>
       </ResponsiveContainer>
     </>
@@ -347,6 +334,8 @@ type Project = {
   title: string;
   subtitle: string;
   company: string;
+  bg: string;
+  reversed: boolean;
   headlinePrefix: string;
   headlineNumber: number;
   headlineSuffix: string;
@@ -366,18 +355,17 @@ const projects: Project[] = [
     title: "Paid Media Budget Optimization",
     subtitle: "BDI/CDI Store-Level Reallocation Model",
     company: "National Automotive Franchise Group",
+    bg: "#FFFFFF",
+    reversed: false,
     headlinePrefix: "$",
     headlineNumber: 280,
     headlineSuffix: "K",
     headlineLabel: "reallocation opportunity identified",
     tags: ["Snowflake SQL", "Excel", "Google Ads", "Franchise POS Data", "AI-assisted analysis"],
     role: "Designed the framework, built the analysis model, and translated findings into executive-ready recommendations.",
-    problem:
-      "Paid media budgets were spread too evenly across 180 corporate locations. Prior analysis relied on market-level estimates — too blunt for store-by-store decisions and unable to account for seasonal exceptions.",
-    action:
-      "Rebuilt the model around store-level BDI/CDI using ~1.1M point-of-sale transactions. Corrected ghost location IDs, added a seasonality checkpoint, and built a four-tier (Protect / Invest / Develop / Reduce) prioritization map with immediate-action tiers.",
-    result:
-      "Leadership received a defensible $280K reallocation opportunity with a clear store-level action map — making budget conversations faster and more evidence-based.",
+    problem: "Paid media budgets were spread too evenly across 180 corporate locations. Prior analysis relied on market-level estimates — too blunt for store-by-store decisions and unable to account for seasonal exceptions.",
+    action: "Rebuilt the model around store-level BDI/CDI using ~1.1M point-of-sale transactions. Corrected ghost location IDs, added a seasonality checkpoint, and built a four-tier (Protect / Invest / Develop / Reduce) prioritization map with immediate-action tiers.",
+    result: "Leadership received a defensible $280K reallocation opportunity with a clear store-level action map — making budget conversations faster and more evidence-based.",
     miniStats: [
       { target: 180, label: "locations analyzed" },
       { display: "~1.1M", label: "POS transactions modeled" },
@@ -389,18 +377,17 @@ const projects: Project[] = [
     title: "Multi-Channel Attribution Architecture",
     subtitle: "Store-Month Marketing Attribution Layer",
     company: "National Automotive Franchise Group",
+    bg: "#F5F3EE",
+    reversed: true,
     headlinePrefix: "",
     headlineNumber: 6900,
     headlineSuffix: "",
     headlineLabel: "store-month rows modeled across 8 channels",
     tags: ["Excel modeling", "SharePoint", "Attribution design", "Executive reporting"],
     role: "Architected the model, codified assumptions, and aligned delivery with CMO/CEO planning workflows.",
-    problem:
-      "Attribution logic lived across fragmented files and inconsistent assumptions — creating reconciliation risk and slowing executive reporting across 286 locations and 8 channels.",
-    action:
-      "Designed an auditable Excel architecture with channel-specific allocation rules, clear input boundaries, and a dedicated CEO planning lever. Kept scenario planning separate from historical actuals to prevent version drift.",
-    result:
-      "The organization gained a single trusted attribution layer covering 286 locations × 24 months. Monthly decision-making became more consistent across marketing leadership.",
+    problem: "Attribution logic lived across fragmented files and inconsistent assumptions — creating reconciliation risk and slowing executive reporting across 286 locations and 8 channels.",
+    action: "Designed an auditable Excel architecture with channel-specific allocation rules, clear input boundaries, and a dedicated CEO planning lever. Kept scenario planning separate from historical actuals to prevent version drift.",
+    result: "The organization gained a single trusted attribution layer covering 286 locations × 24 months. Monthly decision-making became more consistent across marketing leadership.",
     miniStats: [
       { target: 286, label: "franchise locations covered" },
       { target: 8, label: "channels unified" },
@@ -412,18 +399,17 @@ const projects: Project[] = [
     title: "Store Service Intelligence System",
     subtitle: "Demand Analysis + CRM Journey Suppression",
     company: "National Automotive Franchise Group",
+    bg: "#FFFFFF",
+    reversed: false,
     headlinePrefix: "up to ",
     headlineNumber: 40,
     headlineSuffix: "%",
     headlineLabel: "non-oil activity undercounted before taxonomy fix",
     tags: ["Snowflake SQL", "Python", "Excel pipeline", "Franchise CRM", "Dashboard logic"],
     role: "Led query design, data QA, translation of technical caveats, and stakeholder-facing delivery.",
-    problem:
-      "Operations and marketing needed a reliable view of what services locations actually sell — but existing taxonomy logic was creating confusion and undercounting non-oil service activity by 25–40%.",
-    action:
-      "Built unified SQL and Excel outputs with fleet filtering, oil/non-oil toggles, and service taxonomy normalization across ~285 locations. Also designed a CRM journey suppression query to reduce irrelevant follow-up messaging.",
-    result:
-      "Teams got cleaner targeting logic and a more credible view of location demand — enabling better service marketing prioritization and less noise in retention workflows.",
+    problem: "Operations and marketing needed a reliable view of what services locations actually sell — but existing taxonomy logic was undercounting non-oil service activity by 25–40%.",
+    action: "Built unified SQL and Excel outputs with fleet filtering, oil/non-oil toggles, and service taxonomy normalization across ~285 locations. Also designed a CRM journey suppression query to reduce irrelevant follow-up messaging.",
+    result: "Teams got cleaner targeting logic and a more credible view of location demand — enabling better service marketing prioritization and less noise in retention workflows.",
     miniStats: [
       { target: 285, prefix: "~", label: "locations analyzed" },
       { display: "25–40%", label: "undercount gap corrected" },
@@ -432,129 +418,137 @@ const projects: Project[] = [
   },
 ];
 
-// ── Project section ───────────────────────────────────────────────────────────
+// ── Project section — editorial, no card borders ──────────────────────────────
 function ProjectSection({ project }: { project: Project }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 52 }}
-      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 52 }}
-      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      className="overflow-hidden rounded-3xl border border-[#E8E4DC] bg-white shadow-sm"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#E8E4DC] px-6 py-4 sm:px-8">
-        <span className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
-          Case Study {project.number}
-        </span>
-        <span className="text-xs text-[#9E988F]">{project.company}</span>
+    <section ref={ref} style={{ background: project.bg }} className="relative overflow-hidden px-6 py-20 sm:px-12 lg:px-24">
+      {/* Watermark number */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-2 top-2 select-none font-black leading-none text-[#12110F]/[0.04]"
+        style={{ fontSize: "clamp(100px, 16vw, 180px)" }}
+      >
+        {project.number}
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_1.2fr]">
-        {/* Left: title, metric callout, PAR */}
-        <div className="border-b border-[#E8E4DC] p-6 sm:p-8 lg:border-b-0 lg:border-r">
-          <h3 className="text-2xl font-bold tracking-tight">{project.title}</h3>
-          <p className="mt-1 text-sm text-[#6B6560]">{project.subtitle}</p>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={inView ? { opacity: 1, scale: 1 } : {}}
-            transition={{ delay: 0.2, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-6 rounded-2xl bg-[#EEF2FF] px-6 py-5"
-          >
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#1E40AF]">
-              Key outcome
-            </p>
-            <p className="mt-2 text-5xl font-bold tracking-tight text-[#1E3A8A]">
-              {project.headlinePrefix}{project.headlineNumber.toLocaleString()}{project.headlineSuffix}
-            </p>
-            <p className="mt-1 text-sm text-[#374151]">{project.headlineLabel}</p>
-          </motion.div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {project.tags.map((tag) => (
-              <span key={tag} className="rounded-full border border-[#E8E4DC] bg-[#FAFAF8] px-3 py-1 text-xs font-medium text-[#6B6560]">
-                {tag}
-              </span>
-            ))}
-          </div>
-
-          <p className="mt-4 text-xs italic text-[#9E988F]">{project.role}</p>
-
-          <div className="mt-6 space-y-3">
-            {[
-              { label: "Problem", text: project.problem },
-              { label: "Action",  text: project.action  },
-              { label: "Result",  text: project.result  },
-            ].map((block, i) => (
-              <motion.div
-                key={block.label}
-                initial={{ opacity: 0, x: -12 }}
-                animate={inView ? { opacity: 1, x: 0 } : {}}
-                transition={{ delay: 0.25 + i * 0.1, duration: 0.45 }}
-                className="rounded-xl border border-[#E8E4DC] bg-[#FAFAF8] p-4"
-              >
-                <p className="text-xs font-bold uppercase tracking-widest text-[#9E988F]">
-                  {block.label}
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-[#374151]">{block.text}</p>
-              </motion.div>
-            ))}
-          </div>
+      <motion.div
+        initial={{ opacity: 0, y: 44 }}
+        animate={inView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="relative mx-auto w-full max-w-5xl"
+      >
+        {/* Label row */}
+        <div className="mb-10 flex items-center gap-4">
+          <span className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
+            Case Study {project.number}
+          </span>
+          <span className="h-px flex-1 bg-[#E8E4DC]" />
+          <span className="text-xs text-[#9E988F]">{project.company}</span>
         </div>
 
-        {/* Right: chart + mini stats */}
-        <div className="p-6 sm:p-8">
-          <project.Chart active={inView} />
+        {/* Content grid */}
+        <div className="grid gap-12 lg:grid-cols-2 lg:gap-20">
+          {/* Info column */}
+          <div className={project.reversed ? "lg:order-last" : ""}>
+            <h3 className="text-3xl font-bold tracking-tight sm:text-4xl">{project.title}</h3>
+            <p className="mt-2 text-[#6B6560]">{project.subtitle}</p>
 
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            {project.miniStats.map((s, i) => (
-              <div key={i} className="rounded-xl border border-[#E8E4DC] bg-[#FAFAF8] px-4 py-4">
-                {"target" in s ? (
-                  <MiniCountUp target={s.target} prefix={s.prefix} suffix={s.suffix} active={inView} />
-                ) : (
-                  <p className="text-3xl font-bold tracking-tight text-[#12110F]">{s.display}</p>
-                )}
-                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-[#6B6560]">
-                  {s.label}
-                </p>
+            <div className="mt-10">
+              {(["problem", "action", "result"] as const).map((key, i) => (
+                <motion.div
+                  key={key}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={inView ? { opacity: 1, x: 0 } : {}}
+                  transition={{ delay: 0.2 + i * 0.1, duration: 0.45 }}
+                  className="border-t border-[#E8E4DC] py-5"
+                >
+                  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-[#9E988F]">
+                    {key}
+                  </p>
+                  <p className="text-sm leading-relaxed text-[#374151]">{project[key]}</p>
+                </motion.div>
+              ))}
+              <div className="border-t border-[#E8E4DC] pt-5">
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {project.tags.map((tag) => (
+                    <span key={tag} className="text-xs font-medium text-[#9E988F]">{tag}</span>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs italic text-[#9E988F]">{project.role}</p>
               </div>
-            ))}
+            </div>
+          </div>
+
+          {/* Data column */}
+          <div className={project.reversed ? "lg:order-first" : ""}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: 0.15, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <p className="font-black leading-none tracking-tight text-[#1E40AF] sm:text-8xl"
+                style={{ fontSize: "clamp(3.5rem, 8vw, 5.5rem)" }}>
+                {project.headlinePrefix}{project.headlineNumber.toLocaleString()}{project.headlineSuffix}
+              </p>
+              <p className="mt-3 text-sm text-[#6B6560]">{project.headlineLabel}</p>
+            </motion.div>
+
+            <div className="mt-10">
+              <project.Chart active={inView} />
+            </div>
+
+            <div className="mt-8 grid grid-cols-2 gap-6 border-t border-[#E8E4DC] pt-6">
+              {project.miniStats.map((s, i) => (
+                <div key={i}>
+                  {"target" in s ? (
+                    <MiniCountUp target={s.target} prefix={s.prefix} suffix={s.suffix} active={inView} />
+                  ) : (
+                    <p className="text-2xl font-bold tracking-tight text-[#12110F]">{s.display}</p>
+                  )}
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-[#6B6560]">
+                    {s.label}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+    </section>
   );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function Home() {
+  const { canvasRef, onMouseMove, onMouseLeave } = useDotGrid();
+
   return (
     <main className="bg-[#FAFAF8] text-[#12110F]">
       <div className="scroll-progress" aria-hidden />
 
       {/* Nav */}
       <nav className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between bg-[#FAFAF8]/80 px-6 py-4 backdrop-blur-sm sm:px-12">
-        <span className="text-sm font-bold tracking-wide text-[#12110F]">Sam Evans</span>
-        <a
-          href="https://github.com/SKE-creator"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-[#6B6560] transition-colors hover:text-[#12110F]"
-        >
+        <span className="text-sm font-bold tracking-wide">Sam Evans</span>
+        <a href="https://github.com/SKE-creator" target="_blank" rel="noopener noreferrer"
+          className="text-sm text-[#6B6560] transition-colors hover:text-[#12110F]">
           GitHub ↗
         </a>
       </nav>
 
-      {/* Hero */}
-      <section className="dot-grid relative flex min-h-screen flex-col justify-center px-6 pb-20 pt-32 sm:px-12 lg:px-20">
-        <div className="mx-auto w-full max-w-5xl">
+      {/* Hero with interactive dot grid */}
+      <section
+        className="relative flex min-h-screen flex-col justify-center overflow-hidden px-6 pb-20 pt-32 sm:px-12 lg:px-20"
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+      >
+        <canvas ref={canvasRef} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" />
+
+        <div className="relative z-10 mx-auto w-full max-w-5xl">
           <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
             className="mb-5 text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]"
           >
@@ -562,8 +556,7 @@ export default function Home() {
           </motion.p>
 
           <motion.h1
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
             className="max-w-4xl text-5xl font-bold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl"
           >
@@ -571,8 +564,7 @@ export default function Home() {
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.22 }}
             className="mt-7 max-w-xl text-lg leading-relaxed text-[#6B6560]"
           >
@@ -582,24 +574,19 @@ export default function Home() {
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.34 }}
           >
-            <SkillAccordion />
+            <SkillPills />
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ delay: 1.0 }}
             className="mt-14 flex items-center gap-2 text-sm text-[#9E988F]"
           >
             <span>Scroll to explore</span>
-            <motion.span
-              animate={{ y: [0, 6, 0] }}
-              transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-            >
+            <motion.span animate={{ y: [0, 6, 0] }} transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}>
               ↓
             </motion.span>
           </motion.div>
@@ -615,40 +602,30 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Projects */}
-      <section className="px-6 py-20 sm:px-12 lg:px-20">
-        <div className="mx-auto w-full max-w-5xl">
-          <FadeUp>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]">
-              Selected Work
-            </p>
-            <h2 className="mt-3 text-4xl font-bold tracking-tight">Three case studies.</h2>
-            <p className="mt-3 max-w-xl text-[#6B6560]">
-              Each built around a real business problem at a national franchise automotive
-              group — written for fast scan: problem, action, result.
-            </p>
-          </FadeUp>
-        </div>
+      {/* Section header */}
+      <div className="px-6 pb-4 pt-20 sm:px-12 lg:px-20">
+        <FadeUp className="mx-auto w-full max-w-5xl">
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]">Selected Work</p>
+          <h2 className="mt-3 text-4xl font-bold tracking-tight">Three case studies.</h2>
+          <p className="mt-3 max-w-xl text-[#6B6560]">
+            Each built around a real business problem at a national franchise automotive
+            group — written for fast scan: problem, action, result.
+          </p>
+        </FadeUp>
+      </div>
 
-        <div className="mx-auto mt-14 w-full max-w-5xl space-y-16">
-          {projects.map((project) => (
-            <ProjectSection key={project.number} project={project} />
-          ))}
-        </div>
-      </section>
+      {/* Projects — full-width editorial sections */}
+      <div className="mt-10">
+        {projects.map((p) => <ProjectSection key={p.number} project={p} />)}
+      </div>
 
       {/* Methodology */}
       <section className="border-t border-[#E8E4DC] bg-[#EEF2FF] px-6 py-20 sm:px-12 lg:px-20">
         <div className="mx-auto w-full max-w-5xl">
           <FadeUp>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]">
-              How I Work
-            </p>
-            <h2 className="mt-3 text-4xl font-bold tracking-tight">
-              The process behind the output.
-            </h2>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-[#1E40AF]">How I Work</p>
+            <h2 className="mt-3 text-4xl font-bold tracking-tight">The process behind the output.</h2>
           </FadeUp>
-
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { n: "01", step: "Frame the business question clearly enough that the answer is unambiguous." },
@@ -671,12 +648,8 @@ export default function Home() {
       <footer className="border-t border-[#E8E4DC] px-6 py-10 sm:px-12 lg:px-20">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-[#6B6560]">Sam Evans · Denver, CO · Marketing Analytics</p>
-          <a
-            href="https://github.com/SKE-creator/professional-portfolio"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-[#1E40AF] hover:underline"
-          >
+          <a href="https://github.com/SKE-creator/professional-portfolio" target="_blank" rel="noopener noreferrer"
+            className="text-sm text-[#1E40AF] hover:underline">
             View source on GitHub ↗
           </a>
         </div>
