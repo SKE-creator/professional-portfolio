@@ -184,16 +184,26 @@ const SKILLS = [
 ];
 
 function SkillBoxes() {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true });
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => {
+      if (window.scrollY > 50) {
+        setScrolled(true);
+        window.removeEventListener("scroll", onScroll);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <div ref={ref} className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
       {SKILLS.map((skill, i) => (
         <motion.div
           key={skill.label}
           initial={{ opacity: 0, y: 8 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.35, delay: 0.8 + i * 0.15, ease: "easeOut" }}
+          animate={scrolled ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.35, delay: i * 0.15, ease: "easeOut" }}
           className="rounded-2xl border border-[#E8E4DC] bg-white/90 p-5 shadow-sm backdrop-blur-sm"
         >
           <p className="text-xs font-bold uppercase tracking-widest text-[#1E40AF]">
@@ -201,8 +211,8 @@ function SkillBoxes() {
           </p>
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={inView ? { height: "auto", opacity: 1 } : {}}
-            transition={{ duration: 0.5, delay: 0.92 + i * 0.15, ease: [0.22, 1, 0.36, 1] }}
+            animate={scrolled ? { height: "auto", opacity: 1 } : {}}
+            transition={{ duration: 0.5, delay: 0.12 + i * 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
             <p className="mt-3 text-sm leading-relaxed text-[#374151]">{skill.description}</p>
@@ -502,9 +512,9 @@ const fsaProjects: FSAProject[] = [
     headlineLabel: "reallocation opportunity identified",
     tags: ["Snowflake SQL", "Excel", "Google Ads", "Franchise POS Data", "AI-assisted analysis"],
     role: "Designed the framework, built the analysis model, and translated findings into executive-ready recommendations.",
-    problem: "Paid media budgets were spread too evenly across 180 corporate locations. Prior analysis relied on market-level estimates — too blunt for store-by-store decisions and unable to account for seasonal exceptions.",
-    action: "Rebuilt the model around store-level BDI/CDI using ~1.1M point-of-sale transactions. Corrected ghost location IDs, added a seasonality checkpoint, and built a four-tier (Protect / Invest / Develop / Reduce) prioritization map.",
-    result: "Leadership received a defensible $280K reallocation opportunity with a clear store-level action map — making budget conversations faster and more evidence-based.",
+    problem: "Budgets spread evenly across 180 locations. Market-level estimates were too blunt for store-by-store decisions.",
+    action: "Rebuilt around store-level BDI/CDI using ~1.1M POS transactions. Added ghost location correction, seasonality check, and a four-tier prioritization map.",
+    result: "Surfaced a defensible $280K reallocation opportunity with a clear per-store action map.",
     miniStats: [
       { target: 180, label: "locations analyzed" },
       { display: "~1.1M", label: "POS transactions modeled" },
@@ -522,9 +532,9 @@ const fsaProjects: FSAProject[] = [
     headlineLabel: "store-month rows modeled across 8 channels",
     tags: ["Excel modeling", "SharePoint", "Attribution design", "Executive reporting"],
     role: "Architected the model, codified assumptions, and aligned delivery with CMO/CEO planning workflows.",
-    problem: "Attribution logic lived across fragmented files and inconsistent assumptions — creating reconciliation risk and slowing executive reporting across 286 locations and 8 channels.",
-    action: "Designed an auditable Excel architecture with channel-specific allocation rules, clear input boundaries, and a dedicated CEO planning lever. Kept scenario planning separate from historical actuals to prevent version drift.",
-    result: "The organization gained a single trusted attribution layer covering 286 locations × 24 months. Monthly decision-making became more consistent across marketing leadership.",
+    problem: "Attribution logic scattered across files with inconsistent assumptions — impossible to reconcile at 286 locations × 8 channels.",
+    action: "Designed an auditable Excel model with channel-specific rules, a CEO planning lever, and hard separation between scenarios and actuals.",
+    result: "Single trusted attribution layer across 286 locations × 24 months. Monthly decisions no longer require file archaeology.",
     miniStats: [
       { target: 286, label: "franchise locations covered" },
       { target: 8, label: "channels unified" },
@@ -542,9 +552,9 @@ const fsaProjects: FSAProject[] = [
     headlineLabel: "non-oil activity undercounted before taxonomy fix",
     tags: ["Snowflake SQL", "Python", "Excel pipeline", "Franchise CRM", "Dashboard logic"],
     role: "Led query design, data QA, translation of technical caveats, and stakeholder-facing delivery.",
-    problem: "Operations and marketing needed a reliable view of what services locations actually sell — but existing taxonomy logic was undercounting non-oil service activity by 25–40%.",
-    action: "Built unified SQL and Excel outputs with fleet filtering, oil/non-oil toggles, and service taxonomy normalization across ~285 locations. Designed a CRM journey suppression query to reduce irrelevant follow-up messaging.",
-    result: "Teams got cleaner targeting logic and a more credible view of location demand — enabling better service marketing prioritization and less noise in retention workflows.",
+    problem: "Taxonomy logic was undercounting non-oil service activity by 25–40%, making demand signals unreliable for marketing decisions.",
+    action: "Built SQL + Excel pipeline with fleet filtering, oil/non-oil toggles, and taxonomy normalization. Added CRM suppression query to cut irrelevant follow-up messaging.",
+    result: "Cleaner targeting logic and credible demand signals across ~285 locations. Less noise in retention, better service marketing prioritization.",
     miniStats: [
       { target: 285, prefix: "~", label: "locations analyzed" },
       { display: "25–40%", label: "undercount gap corrected" },
@@ -562,9 +572,9 @@ const fsaProjects: FSAProject[] = [
     headlineLabel: "audit dimensions systematized",
     tags: ["Claude API", "Prompt Engineering", "Excel automation", "SEO strategy"],
     role: "Designed the prompt architecture, dimension framework, and output format. Deployed and iterated in production.",
-    problem: "Ad-hoc SEO audits relied on manual lookups across tools — no consistent methodology, no repeatable format, and no way to scale analysis across locations.",
-    action: "Built a Claude API-powered skill that evaluates websites across 6 structured dimensions and outputs a scored 8-tab Excel workbook with templated recommendations and prioritized action items.",
-    result: "Deployed in production. What took a day of manual research now completes in minutes with consistent, auditable output across any location in the franchise system.",
+    problem: "SEO audits were manual, inconsistent, and impossible to scale across a multi-location franchise system.",
+    action: "Built a Claude API skill evaluating 6 structured dimensions, outputting a scored 8-tab Excel workbook with prioritized action items per location.",
+    result: "Day-long audits now complete in under 5 minutes with consistent, auditable output. Deployed in production.",
     miniStats: [
       { display: "8-tab", label: "scored Excel output" },
       { display: "< 5 min", label: "per location audit" },
@@ -582,9 +592,9 @@ const fsaProjects: FSAProject[] = [
     headlineLabel: "channels unified in one live view",
     tags: ["JavaScript", "GitHub Pages", "Data architecture", "Paid media"],
     role: "Designed the architecture, built the application, and eliminated manual upload dependency from the reporting cycle.",
-    problem: "Executive reporting relied on a manually refreshed file — one person uploading CSVs each week, no live cross-channel view, and a single point of failure in the reporting cycle.",
-    action: "Built a self-updating web app hosted on GitHub Pages that auto-fetches from data sources, visualizes 12 channels in a unified view, and requires zero manual uploads to stay current.",
-    result: "CMO-facing dashboard that updates automatically. Eliminated the manual bottleneck and made cross-channel performance visible without waiting on weekly refresh cycles.",
+    problem: "Exec reporting ran through one person uploading CSVs manually. One missed upload broke visibility for the whole org.",
+    action: "Built a GitHub Pages web app that auto-fetches all 12 channels and stays current with no manual input.",
+    result: "CMO-facing cross-channel view that updates itself. No uploads, no bottleneck, no single point of failure.",
     miniStats: [
       { target: 0, label: "manual uploads required" },
       { target: 12, label: "channels tracked" },
@@ -602,9 +612,9 @@ const fsaProjects: FSAProject[] = [
     headlineLabel: "critical attribution flaws documented",
     tags: ["GA4", "Attribution methodology", "Data QA", "Executive reporting"],
     role: "Conducted the full audit, documented findings, and rebuilt the methodology with external validation backing.",
-    problem: "The attribution model relied on a 70% CVR assumption sourced from internal estimates — self-cited, never externally validated, and embedded in financial projections used for executive decisions.",
-    action: "Audited the full assumption chain. Documented 3 critical flaws, derived an empirical CVR closer to 38% from observed data, and rebuilt the methodology with traceable external validation.",
-    result: "Leadership gained a defensible attribution model. The audit became the basis for a full methodology overhaul and eliminated a significant source of over-reported conversion volume.",
+    problem: "Attribution relied on a self-cited 70% CVR assumption — never externally validated, embedded in exec-facing financial projections.",
+    action: "Audited the full assumption chain, documented 3 critical flaws, and derived an empirical CVR of ~38% from observed data.",
+    result: "Defensible methodology replacing a number that was inflating reported conversions across the entire model.",
     miniStats: [
       { display: "70% → 38%", label: "CVR assumption corrected" },
       { display: "3", label: "critical flaws documented" },
@@ -627,9 +637,9 @@ const aiProjects: AIProject[] = [
     headlineLabel: "specialist agents deployed",
     tags: ["Python / Flask", "n8n", "SQLite", "Claude API", "Tailscale", "Model routing"],
     role: "Designed the full architecture, built all components, and deployed on dedicated hardware with remote access via secure tunnel.",
-    problem: "Complex multi-step tasks required starting a fresh Claude session each time — rewriting context, no persistent task history, and no ability to run autonomously while unattended.",
-    action: "Built a PC-hosted pipeline: Flask dashboard, webhook intake, n8n orchestration, SQLite task database, and 11 domain-specific Claude agents. Added intelligent model routing (Haiku / Sonnet / Opus by task complexity) and remote access via Tailscale.",
-    result: "Persistent autonomous execution across 11 skill domains. Tasks run while unattended and are accessible remotely. Complex multi-step work completes as asynchronous background jobs.",
+    problem: "Every complex task required starting a fresh Claude session — no persistent history, no automation, no running while unattended.",
+    action: "Built a PC-hosted pipeline: Flask dashboard, n8n orchestration, SQLite task DB, 11 domain-specific agents, and model routing (Haiku / Sonnet / Opus by task type). Remote access via Tailscale.",
+    result: "Autonomous multi-step work runs in the background across 11 domains while I'm doing other things.",
     miniStats: [
       { target: 11, label: "specialist agents" },
       { display: "3-pass", label: "plan / execute / verify" },
@@ -648,9 +658,9 @@ const aiProjects: AIProject[] = [
     headlineLabel: "ATS platforms supported",
     tags: ["Playwright", "Python", "Claude API", "SQLite", "Multi-agent pipeline"],
     role: "Designed the agent chain, built the ATS detection logic, and wired the full pipeline from discovery to submission.",
-    problem: "Job searching at scale means repetitive research, inconsistent tailoring, and no system for tracking applications or filtering low-fit roles before investing time in materials.",
-    action: "Built a 3-agent chain (research → fit scoring → application generation) with Playwright for automated ATS form completion, SQLite state tracking, multi-platform detection across 6 ATS types, and a 7-dimension fit scoring model to filter low-match roles before generating materials.",
-    result: "Fully automated pipeline from job discovery to application submission. Fit scoring filters roles upstream so materials are only generated for high-match positions.",
+    problem: "Manual job searching doesn't scale — repetitive research, inconsistent tailoring, no tracking, no way to filter bad-fit roles before writing anything.",
+    action: "3-agent chain: research → 7-dimension fit scoring → application generation. Playwright handles ATS form completion across 6 platforms. SQLite tracks state end-to-end.",
+    result: "Materials only get generated for high-fit roles. The rest is filtered before any time is spent.",
     miniStats: [
       { target: 6, label: "ATS platforms" },
       { display: "7-dim", label: "fit scoring model" },
